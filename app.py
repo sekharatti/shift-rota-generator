@@ -1,61 +1,40 @@
-# Set up ngrok (for running Streamlit online)
-from pyngrok import ngrok
-
-# Kill previous tunnels if any
-ngrok.kill()
-
-# Set your Streamlit app port
-port = 8501
-
-# Create a public URL
-public_url = ngrok.connect(port).public_url
-print("Public URL:", public_url)
-
-# --- STREAMLIT APP CODE ---
-
 import streamlit as st
 import pandas as pd
-import random
-import datetime
+from io import BytesIO
 
-st.title("📅 Automated Shift Rota Generator")
+st.set_page_config(page_title="Shift Rota Generator", layout="wide")
+st.title("Shift Rota Generator")
 
-st.sidebar.header("Rota Settings")
-month = st.sidebar.selectbox("Select Month", [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December"
-])
-year = st.sidebar.number_input("Enter Year", 2025, 2100, 2025)
-num_employees = st.sidebar.number_input("Number of Employees", 1, 50, 9)
-shifts = ["M", "E", "N", "O"]
-
-st.sidebar.write("Upload Employee List (Optional)")
-uploaded_file = st.sidebar.file_uploader("Upload Excel/CSV file", type=["xlsx","csv"])
-
-if uploaded_file is not None:
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    else:
+# Upload Excel
+uploaded_file = st.file_uploader("Upload Employee List Excel", type=["xlsx"])
+if uploaded_file:
+    try:
         df = pd.read_excel(uploaded_file)
-    employees = df.iloc[:,0].tolist()
+        st.success("File uploaded successfully!")
+        st.write("Preview of your data:")
+        st.dataframe(df.head())
+
+        # Button to generate rota
+        if st.button("Generate Rota"):
+            # Example: Just copying the data and adding dummy shifts
+            rota = df.copy()
+            rota['Shift'] = ["Morning", "Evening", "Night"] * (len(df)//3 + 1)
+            rota = rota.head(len(df))  # match original length
+            st.write("Generated Rota:")
+            st.dataframe(rota)
+
+            # Download rota as Excel
+            output = BytesIO()
+            rota.to_excel(output, index=False)
+            output.seek(0)
+            st.download_button(
+                label="Download Rota Excel",
+                data=output,
+                file_name="generated_rota.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    except Exception as e:
+        st.error(f"Error reading the Excel file: {e}")
 else:
-    employees = [f"Emp{i+1}" for i in range(num_employees)]
+    st.info("Please upload an Excel file to get started.")
 
-st.write(f"### Generating Rota for **{month} {year}**")
-st.write(f"Employees: {', '.join(employees)}")
-
-# Generate Rota
-days_in_month = (datetime.date(year, list(datetime.date(1900, 1, 1).strftime('%B') for _ in range(12)).index(month)+2, 1) - datetime.timedelta(days=1)).day
-rota = pd.DataFrame(index=employees, columns=[f"{i+1}" for i in range(days_in_month)])
-
-for emp in employees:
-    for day in rota.columns:
-        rota.loc[emp, day] = random.choice(shifts)
-
-st.dataframe(rota)
-
-# Download Excel
-if st.button("📥 Download Rota as Excel"):
-    rota.to_excel("Generated_Rota.xlsx")
-    with open("Generated_Rota.xlsx", "rb") as f:
-        st.download_button("Download File", f, file_name="Rota.xlsx")

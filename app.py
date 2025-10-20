@@ -9,8 +9,8 @@ st.title("Shift Rota Generator")
 
 st.markdown("""
 Upload an Excel file with your employee list and generate a multi-day shift rota automatically.  
-Features:  
-- 3 shifts per day: Morning, Evening, Night  
+**Layout:** Employee names in rows, dates in columns.  
+- 3 shifts per day: Morning, Afternoon, Night  
 - Weekly offs automatically assigned (1 per employee per week)  
 - Downloadable Excel file  
 """)
@@ -27,46 +27,44 @@ if uploaded_file:
             st.write("Preview of your data:")
             st.dataframe(df.head())
 
-            # User input: Number of days to generate rota
+            # User input: Number of days
             num_days = st.number_input("Number of days to generate rota", min_value=1, value=30, step=1)
             
-            # Generate Rota button
             if st.button("Generate Rota"):
                 employees = df.iloc[:,0].tolist()  # assume first column has employee names
-                shifts = ["Morning", "Evening", "Night"]
+                shifts = ["Morning", "Afternoon", "Night"]
 
-                # Create empty dataframe for the rota
+                # Generate dates
                 dates = [datetime.today().date() + timedelta(days=i) for i in range(num_days)]
-                rota_data = []
+                date_cols = [d.strftime("%Y-%m-%d") for d in dates]
 
-                # Initialize counters for weekly off assignment
-                weekly_off_counter = {emp:0 for emp in employees}
+                # Initialize rota dictionary
+                rota_dict = {emp: [] for emp in employees}
+                weekly_off_counter = {emp: 0 for emp in employees}
 
-                for day in dates:
-                    day_shift = []
-                    # Assign shifts
+                # Assign shifts for each day
+                for day_index in range(num_days):
                     for i, emp in enumerate(employees):
-                        # Weekly off: one per 7 days
+                        # Weekly off logic: 1 per 7 days
                         if weekly_off_counter[emp] >= 6:
-                            assigned_shift = "Weekly Off"
+                            shift = "Weekly Off"
                             weekly_off_counter[emp] = 0
                         else:
-                            assigned_shift = shifts[i % len(shifts)]
+                            shift = shifts[i % len(shifts)]
                             weekly_off_counter[emp] += 1
-                        day_shift.append(assigned_shift)
-                    rota_data.append(day_shift)
+                        rota_dict[emp].append(shift)
 
-                rota_df = pd.DataFrame(rota_data, columns=employees)
-                rota_df.insert(0, "Date", [d.strftime("%Y-%m-%d") for d in dates])
+                # Convert to DataFrame: rows=employees, columns=dates
+                rota_df = pd.DataFrame(rota_dict, index=date_cols).T
+                rota_df.index.name = "Employee"
 
                 st.write("Generated Multi-Day Rota:")
                 st.dataframe(rota_df)
 
-                # Prepare download
+                # Download Excel
                 output = BytesIO()
-                rota_df.to_excel(output, index=False)
+                rota_df.to_excel(output)
                 output.seek(0)
-
                 st.download_button(
                     label="Download Rota Excel",
                     data=output,
@@ -78,3 +76,4 @@ if uploaded_file:
         st.error(f"Error reading the Excel file: {e}")
 else:
     st.info("Please upload an Excel file to get started.")
+

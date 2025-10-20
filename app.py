@@ -1,5 +1,3 @@
-!pip install streamlit pyngrok pandas openpyxl --quiet
-
 # Set up ngrok (for running Streamlit online)
 from pyngrok import ngrok
 
